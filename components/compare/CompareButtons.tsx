@@ -1,3 +1,7 @@
+'use client'
+
+import { motion } from 'framer-motion'
+
 interface CompareButtonsProps {
   leftName: string
   rightName: string
@@ -12,25 +16,24 @@ export default function CompareButtons({
   onChooseRight,
 }: CompareButtonsProps) {
   return (
-    <div className="flex gap-3 px-4">
-      <button
+    <div className="flex gap-2 px-3 pb-1">
+      <motion.button
+        whileTap={{ scale: 0.95 }}
         onClick={onChooseLeft}
-        className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-emerald-900 active:bg-emerald-800 rounded-2xl text-sm font-semibold text-zinc-200 transition-colors flex items-center justify-center gap-2"
+        className="flex-1 py-3 px-3 bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-900/50 rounded-2xl text-sm font-bold text-zinc-300 transition-colors flex items-center justify-center gap-1.5 border border-zinc-700/50"
       >
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-          <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <span className="truncate max-w-[120px]">{leftName}</span>
-      </button>
-      <button
+        <span className="text-base">👈</span>
+        <span className="truncate max-w-[100px]">{leftName}</span>
+      </motion.button>
+
+      <motion.button
+        whileTap={{ scale: 0.95 }}
         onClick={onChooseRight}
-        className="flex-1 py-3 px-4 bg-zinc-800 hover:bg-emerald-900 active:bg-emerald-800 rounded-2xl text-sm font-semibold text-zinc-200 transition-colors flex items-center justify-center gap-2"
+        className="flex-1 py-3 px-3 bg-zinc-800 hover:bg-zinc-700 active:bg-emerald-900/50 rounded-2xl text-sm font-bold text-zinc-300 transition-colors flex items-center justify-center gap-1.5 border border-zinc-700/50"
       >
-        <span className="truncate max-w-[120px]">{rightName}</span>
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
-          <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </button>
+        <span className="truncate max-w-[100px]">{rightName}</span>
+        <span className="text-base">👉</span>
+      </motion.button>
     </div>
   )
 }

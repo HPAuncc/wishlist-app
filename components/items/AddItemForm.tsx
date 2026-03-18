@@ -109,7 +109,14 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           {result && !error && (
-            <div className="bg-zinc-800 rounded-2xl overflow-hidden">
+            <div className={`rounded-2xl overflow-hidden ${result.partial ? 'bg-amber-950/40 border border-amber-800/40' : 'bg-zinc-800'}`}>
+              {result.partial && (
+                <div className="px-4 pt-3 pb-1">
+                  <p className="text-amber-400 text-xs font-semibold">
+                    ⚠️ {result.retailer ?? 'This store'} blocks auto-fetch — we got the name from the URL. Add the price below.
+                  </p>
+                </div>
+              )}
               <div className="flex gap-3 p-4">
                 {result.imageUrl && (
                   <img
@@ -133,9 +140,9 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
               <div className="flex gap-2 px-4 pb-4">
                 <button
                   onClick={populateFromScrape}
-                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold rounded-xl text-sm transition-colors"
+                  className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition-colors"
                 >
-                  Add to List
+                  {result.partial ? 'Edit & Add →' : 'Add to List'}
                 </button>
                 <button
                   onClick={reset}
@@ -148,8 +155,8 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           <p className="text-zinc-600 text-xs text-center">
-            Works with Target, Walmart, Etsy, Wayfair, and more.
-            <br />Amazon links may need to be added manually.
+            Works with Etsy, IKEA, Crate & Barrel, Pottery Barn, West Elm & more.
+            <br />Amazon, Lowe's & Walmart need manual entry.
           </p>
         </div>
       )}

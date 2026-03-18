@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseMetadata } from '@/lib/url-parser'
+import { parseMetadata, extractNameFromSlug, detectRetailer } from '@/lib/url-parser'
+import { ScrapedMetadata } from '@/types'
+
+async function fetchDirect(url: string): Promise<string> {
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Cache-Control': 'no-cache',
+    },
+    signal: AbortSignal.timeout(8000),
+  })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.text()
+}
+
+async function fetchViaMicrolink(url: string): Promise<ScrapedMetadata> {
+  const apiUrl = `https://api.microlink.io?url=${encodeURIComponent(url)}&meta=true`
+  const response = await fetch(apiUrl, {
+    signal: AbortSignal.timeout(12000),
+  })
+  if (!response.ok) throw new Error(`Microlink HTTP ${response.status}`)
+  const json = await response.json()
+  if (json.status !== 'success') throw new Error('Microlink returned non-success')
+
+  const data = json.data ?? {}
+  return {
+    title: data.title ?? undefined,
+    description: data.description ?? undefined,
+    imageUrl: data.image?.url ?? data.logo?.url ?? undefined,
+    price: data.price ?? undefined,
+    retailer: detectRetailer(url) ?? new URL(url).hostname.replace(/^www\./, '').split('.')[0],
+    originalUrl: url,
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,22 +56,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only http/https URLs allowed' }, { status: 400 })
     }
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
-      signal: AbortSignal.timeout(8000),
-    })
+    const hostname = parsed.hostname.replace(/^www\./, '')
+    const brandName = hostname.split('.')[0].toLowerCase()
 
-    if (!response.ok) {
-      return NextResponse.json({ error: `Page returned ${response.status}` }, { status: 502 })
+    function isGenericTitle(title: string | undefined): boolean {
+      if (!title) return true
+      const t = title.toLowerCase()
+      return (
+        t.includes(brandName) ||
+        t.split(' ').length < 3 ||
+        /\|\s*(home|shop|store|furniture|decor|design|style|fashion|deals|sale)\b/.test(t) ||
+        /(home\s+furniture|home\s+decor|outdoor\s+furniture|free\s+shipping|shop\s+now|official\s+site)/.test(t)
+      )
     }
 
-    const html = await response.text()
-    const metadata = parseMetadata(html, url)
-    return NextResponse.json(metadata)
+    // Try direct fetch first
+    try {
+      const html = await fetchDirect(url)
+      const metadata = parseMetadata(html, url)
+      if (metadata.title && !isGenericTitle(metadata.title)) return NextResponse.json(metadata)
+      throw new Error('No useful title found in direct fetch')
+    } catch {
+      // Fall through to Microlink
+    }
+
+    // Fallback: Microlink (handles bot-protected sites)
+    try {
+      const metadata = await fetchViaMicrolink(url)
+      if (!isGenericTitle(metadata.title)) return NextResponse.json(metadata)
+      throw new Error('Microlink returned generic title')
+    } catch {
+      // Last resort: extract name from URL slug so user gets something useful
+      const slugName = extractNameFromSlug(url)
+      if (slugName) {
+        const partial: ScrapedMetadata = {
+          title: slugName,
+          retailer: detectRetailer(url),
+          originalUrl: url,
+          partial: true,
+        }
+        return NextResponse.json(partial)
+      }
+      return NextResponse.json({ error: 'Could not fetch that URL' }, { status: 502 })
+    }
   } catch {
     return NextResponse.json({ error: 'Failed to fetch URL' }, { status: 500 })
   }

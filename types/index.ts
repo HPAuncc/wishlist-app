@@ -46,6 +46,7 @@ export interface ScrapedMetadata {
   imageUrl?: string
   retailer?: string
   originalUrl: string
+  partial?: boolean // true when only URL slug could be parsed (site blocked full fetch)
 }
 
 export type SwipeDirection = 'left' | 'right' | 'none'

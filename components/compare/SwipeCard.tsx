@@ -16,25 +16,29 @@ function formatPrice(cents: number): string {
 
 export default function SwipeCard({ item, side, onChoose }: SwipeCardProps) {
   const x = useMotionValue(0)
-  const rotate = useTransform(x, [-200, 0, 200], side === 'left' ? [-12, 0, 12] : [12, 0, -12])
-  const badgeOpacity = useTransform(x, side === 'left' ? [30, 120] : [-120, -30], [0, 1])
-  const cardOpacity = useTransform(x, [-250, -100, 0, 100, 250], [0.6, 1, 1, 1, 0.6])
+  const rotate = useTransform(x, [-200, 0, 200], side === 'left' ? [-10, 0, 10] : [10, 0, -10])
+
+  // Badge: appears when dragging toward center (outward from side)
+  const badgeOpacity = useTransform(x, side === 'left' ? [25, 100] : [-100, -25], [0, 1])
+  const badgeScale = useTransform(x, side === 'left' ? [25, 100] : [-100, -25], [0.7, 1])
+
+  // Green glow overlay when dragging to choose
+  const glowOpacity = useTransform(x, side === 'left' ? [0, 120] : [-120, 0], [0, 0.5])
+
   const constraintRef = useRef(null)
 
   function handleDragEnd(_: unknown, info: PanInfo) {
     const offset = info.offset.x
     const velocity = info.velocity.x
-    const threshold = 80
-    const velocityThreshold = 400
 
     const shouldCommit =
-      Math.abs(offset) > threshold || Math.abs(velocity) > velocityThreshold
+      Math.abs(offset) > 80 || Math.abs(velocity) > 400
 
     if (shouldCommit) {
-      const flyX = offset > 0 ? 600 : -600
-      animate(x, flyX, { duration: 0.25, ease: 'easeOut' }).then(onChoose)
+      const flyX = offset > 0 ? 700 : -700
+      animate(x, flyX, { duration: 0.22, ease: 'easeOut' }).then(onChoose)
     } else {
-      animate(x, 0, { type: 'spring', stiffness: 400, damping: 30 })
+      animate(x, 0, { type: 'spring', stiffness: 500, damping: 35 })
     }
   }
 
@@ -43,23 +47,30 @@ export default function SwipeCard({ item, side, onChoose }: SwipeCardProps) {
       <motion.div
         drag="x"
         dragConstraints={constraintRef}
-        dragElastic={0.6}
+        dragElastic={0.5}
         onDragEnd={handleDragEnd}
-        style={{ x, rotate, opacity: cardOpacity }}
-        className="bg-zinc-900 rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing h-full"
+        style={{ x, rotate }}
+        whileTap={{ scale: 0.97 }}
+        className="bg-zinc-900 rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing h-full flex flex-col border border-zinc-800"
       >
+        {/* Green pick glow overlay */}
+        <motion.div
+          style={{ opacity: glowOpacity }}
+          className="absolute inset-0 bg-gradient-to-b from-emerald-500/20 to-transparent z-10 pointer-events-none rounded-2xl"
+        />
+
         {/* Choice badge */}
         <motion.div
-          style={{ opacity: badgeOpacity }}
-          className="absolute inset-x-0 top-3 flex justify-center z-10 pointer-events-none"
+          style={{ opacity: badgeOpacity, scale: badgeScale }}
+          className="absolute inset-x-0 top-2.5 flex justify-center z-20 pointer-events-none"
         >
-          <span className="bg-emerald-500 text-zinc-950 text-xs font-bold px-3 py-1 rounded-full">
-            FIRST
+          <span className="bg-emerald-400 text-zinc-950 text-xs font-black px-3 py-1 rounded-full shadow-lg shadow-emerald-500/40 tracking-wide">
+            ✓ PICK
           </span>
         </motion.div>
 
         {/* Image */}
-        <div className="w-full aspect-square bg-zinc-800 relative">
+        <div className="w-full aspect-square bg-zinc-800/80 relative shrink-0">
           {item.imageUrl ? (
             <img
               src={item.imageUrl}
@@ -68,29 +79,25 @@ export default function SwipeCard({ item, side, onChoose }: SwipeCardProps) {
               draggable={false}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <svg width="48" height="48" fill="none" viewBox="0 0 24 24">
-                <path
-                  d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                  stroke="#3f3f46"
-                  strokeWidth="1.5"
-                />
-              </svg>
+            <div className="w-full h-full flex items-center justify-center text-5xl">
+              🛍️
             </div>
           )}
         </div>
 
         {/* Info */}
-        <div className="p-3">
-          <p className="font-semibold text-zinc-100 text-sm leading-tight line-clamp-2">
+        <div className="p-3 flex-1 flex flex-col justify-between">
+          <p className="font-bold text-zinc-100 text-sm leading-snug line-clamp-2">
             {item.name}
           </p>
-          {item.price != null && (
-            <p className="text-emerald-400 text-sm font-medium mt-1">{formatPrice(item.price)}</p>
-          )}
-          {item.retailer && (
-            <p className="text-zinc-500 text-xs mt-0.5">{item.retailer}</p>
-          )}
+          <div className="mt-2">
+            {item.price != null && (
+              <p className="text-emerald-400 text-sm font-bold">{formatPrice(item.price)}</p>
+            )}
+            {item.retailer && (
+              <p className="text-zinc-600 text-xs mt-0.5">{item.retailer}</p>
+            )}
+          </div>
         </div>
       </motion.div>
     </div>
