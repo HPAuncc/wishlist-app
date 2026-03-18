@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { WishlistItem } from '@/types'
 
 interface RankedListItemProps {
@@ -9,27 +10,55 @@ interface RankedListItemProps {
   onDelete: (id: string) => void
 }
 
+const MEDALS = ['🥇', '🥈', '🥉']
+
 function RankBadge({ rank }: { rank: number }) {
-  const base = 'w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0'
-  if (rank === 1) return <div className={`${base} bg-yellow-400 text-zinc-950`}>#1</div>
-  if (rank === 2) return <div className={`${base} bg-zinc-400 text-zinc-950`}>#2</div>
-  if (rank === 3) return <div className={`${base} bg-amber-600 text-zinc-950`}>#3</div>
-  return <div className={`${base} bg-zinc-800 text-zinc-400`}>#{rank}</div>
+  if (rank <= 3) {
+    const colors = [
+      'bg-gradient-to-br from-yellow-300 to-yellow-500 text-zinc-900 shadow-lg shadow-yellow-500/30',
+      'bg-gradient-to-br from-zinc-300 to-zinc-400 text-zinc-900 shadow-lg shadow-zinc-400/20',
+      'bg-gradient-to-br from-amber-500 to-amber-700 text-zinc-900 shadow-lg shadow-amber-600/20',
+    ]
+    return (
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-sm shrink-0 ${colors[rank - 1]}`}>
+        {MEDALS[rank - 1]}
+      </div>
+    )
+  }
+  return (
+    <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0 bg-zinc-800 text-zinc-500">
+      #{rank}
+    </div>
+  )
 }
 
 function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
+const rankClass: Record<number, string> = {
+  1: 'rank-1',
+  2: 'rank-2',
+  3: 'rank-3',
+}
+
 export default function RankedListItem({ item, rank, onDelete }: RankedListItemProps) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const uncertain = item.comparisonCount < 3
+  const extra = rankClass[rank] ?? ''
 
   return (
-    <div className="bg-zinc-900 rounded-2xl overflow-hidden">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      className={`bg-zinc-900 rounded-2xl overflow-hidden ${extra}`}
+    >
       <button
-        className="w-full text-left p-4 flex items-center gap-3"
+        className="w-full text-left p-4 flex items-center gap-3 active:bg-zinc-800/50 transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
         <RankBadge rank={rank} />
@@ -41,93 +70,101 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
             className="w-14 h-14 rounded-xl object-cover shrink-0 bg-zinc-800"
           />
         ) : (
-          <div className="w-14 h-14 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0">
-            <svg width="24" height="24" fill="none" viewBox="0 0 24 24">
-              <path
-                d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                stroke="#52525b"
-                strokeWidth="2"
-              />
-            </svg>
+          <div className="w-14 h-14 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-2xl">
+            🛍️
           </div>
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1">
-            <p className="font-semibold text-zinc-100 truncate">{item.name}</p>
+          <div className="flex items-center gap-1.5">
+            <p className={`font-semibold truncate ${rank === 1 ? 'shimmer-text text-base' : 'text-zinc-100'}`}>
+              {item.name}
+            </p>
             {uncertain && (
-              <span className="text-zinc-500 text-xs shrink-0" title="Position may shift with more comparisons">
+              <span className="text-zinc-600 text-xs shrink-0" title="Position may shift with more comparisons">
                 ~
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             {item.price != null && (
-              <span className="text-emerald-400 text-sm font-medium">{formatPrice(item.price)}</span>
+              <span className={`text-sm font-semibold ${rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-zinc-300' : 'text-emerald-400'}`}>
+                {formatPrice(item.price)}
+              </span>
             )}
             {item.retailer && (
-              <span className="text-zinc-500 text-xs">{item.retailer}</span>
+              <span className="text-zinc-600 text-xs">{item.retailer}</span>
             )}
           </div>
         </div>
 
-        <svg
-          width="20"
-          height="20"
-          fill="none"
-          viewBox="0 0 24 24"
-          className={`shrink-0 text-zinc-600 transition-transform ${expanded ? 'rotate-180' : ''}`}
+        <motion.div
+          animate={{ rotate: expanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="shrink-0 text-zinc-600"
         >
-          <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </motion.div>
       </button>
 
-      {expanded && (
-        <div className="px-4 pb-4 border-t border-zinc-800 pt-3 space-y-3">
-          {item.description && (
-            <p className="text-zinc-400 text-sm">{item.description}</p>
-          )}
-          <div className="flex gap-2">
-            {item.productUrl && (
-              <a
-                href={item.productUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-2 px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-center font-medium transition-colors"
-              >
-                View Product
-              </a>
-            )}
-            {!confirmDelete ? (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="py-2 px-4 bg-zinc-800 hover:bg-red-900 rounded-xl text-sm font-medium text-zinc-400 hover:text-red-400 transition-colors"
-              >
-                Delete
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onDelete(item.id)}
-                  className="py-2 px-4 bg-red-900 hover:bg-red-800 rounded-xl text-sm font-medium text-red-300 transition-colors"
-                >
-                  Confirm
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="py-2 px-4 bg-zinc-800 rounded-xl text-sm font-medium transition-colors"
-                >
-                  Cancel
-                </button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 border-t border-zinc-800 pt-3 space-y-3">
+              {item.description && (
+                <p className="text-zinc-400 text-sm">{item.description}</p>
+              )}
+              <div className="flex gap-2 flex-wrap">
+                {item.productUrl && (
+                  <a
+                    href={item.productUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2.5 px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-center font-medium transition-colors min-w-[120px]"
+                  >
+                    View Product ↗
+                  </a>
+                )}
+                {!confirmDelete ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
+                    className="py-2.5 px-4 bg-zinc-800 hover:bg-red-950 rounded-xl text-sm font-medium text-zinc-500 hover:text-red-400 transition-colors"
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDelete(item.id) }}
+                      className="py-2.5 px-4 bg-red-950 hover:bg-red-900 rounded-xl text-sm font-medium text-red-300 transition-colors"
+                    >
+                      Yes, remove
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete(false) }}
+                      className="py-2.5 px-4 bg-zinc-800 rounded-xl text-sm font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <p className="text-zinc-600 text-xs">
-            {item.comparisonCount} comparison{item.comparisonCount !== 1 ? 's' : ''}
-            {uncertain ? ' · Position may shift as you add more comparisons' : ''}
-          </p>
-        </div>
-      )}
-    </div>
+              <p className="text-zinc-700 text-xs">
+                {item.comparisonCount} comparison{item.comparisonCount !== 1 ? 's' : ''}
+                {uncertain ? ' · still calibrating' : ' · well calibrated'}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
