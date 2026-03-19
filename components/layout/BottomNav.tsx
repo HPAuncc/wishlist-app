@@ -30,6 +30,12 @@ export default function BottomNav({ compareCount = 0 }: BottomNavProps) {
       emoji: '➕',
       activeEmoji: '➕',
     },
+    {
+      href: '/household',
+      label: 'Settings',
+      emoji: '⚙️',
+      activeEmoji: '⚙️',
+    },
   ]
 
   return (

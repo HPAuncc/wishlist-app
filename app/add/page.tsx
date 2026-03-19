@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useWishlist } from '@/hooks/useWishlist'
+import { useSupabaseWishlist } from '@/hooks/useSupabaseWishlist'
 import { useComparisons } from '@/hooks/useComparisons'
 import AddItemForm from '@/components/items/AddItemForm'
 import BottomNav from '@/components/layout/BottomNav'
@@ -12,7 +12,7 @@ type ItemDraft = Omit<WishlistItem, 'id' | 'addedAt' | 'eloRating' | 'comparison
 
 export default function AddPage() {
   const router = useRouter()
-  const { store, setStore, addItem, deleteItem, sortedItems, hydrated } = useWishlist()
+  const { store, setStore, addItem, deleteItem, sortedItems, hydrated } = useSupabaseWishlist()
   const { queueNewItem, queueLength } = useComparisons(store, setStore)
 
   function handleAdd(draft: ItemDraft, removeIds?: string[]) {

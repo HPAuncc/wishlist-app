@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useWishlist } from '@/hooks/useWishlist'
+import { useRouter } from 'next/navigation'
+import { useSupabaseWishlist } from '@/hooks/useSupabaseWishlist'
 import { useComparisons } from '@/hooks/useComparisons'
 import RankedList from '@/components/list/RankedList'
 import BottomNav from '@/components/layout/BottomNav'
 import ShareModal from '@/components/list/ShareModal'
 
 export default function ListPage() {
-  const { store, setStore, sortedItems, deleteItem, hydrated } = useWishlist()
+  const router = useRouter()
+  const { store, setStore, sortedItems, deleteItem, hydrated, householdId } = useSupabaseWishlist()
   const { queueLength } = useComparisons(store, setStore)
   const [showShare, setShowShare] = useState(false)
+
+  // Redirect to household setup if no household
+  useEffect(() => {
+    if (hydrated && !householdId) router.push('/household')
+  }, [hydrated, householdId, router])
 
   return (
     <div className="flex flex-col min-h-screen pb-20">

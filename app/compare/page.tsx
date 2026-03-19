@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useWishlist } from '@/hooks/useWishlist'
+import { useSupabaseWishlist } from '@/hooks/useSupabaseWishlist'
 import { useComparisons } from '@/hooks/useComparisons'
 import SwipeArena from '@/components/compare/SwipeArena'
 import BottomNav from '@/components/layout/BottomNav'
 
 export default function ComparePage() {
-  const { store, setStore, hydrated } = useWishlist()
+  const { store, setStore, hydrated } = useSupabaseWishlist()
   const { currentTask, queueLength, recordComparison } = useComparisons(store, setStore)
 
   const noItems = store.items.length < 2
