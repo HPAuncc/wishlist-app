@@ -7,7 +7,8 @@ import { WishlistItem, BundledItem } from '@/types'
 type ItemDraft = Omit<WishlistItem, 'id' | 'addedAt' | 'eloRating' | 'comparisonCount'>
 
 interface AddItemFormProps {
-  onAdd: (item: ItemDraft) => void
+  onAdd: (item: ItemDraft, removeIds?: string[]) => void
+  existingItems?: WishlistItem[]
 }
 
 function parsePriceInput(raw: string): number | undefined {
@@ -21,7 +22,7 @@ function formatPrice(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
-export default function AddItemForm({ onAdd }: AddItemFormProps) {
+export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormProps) {
   const [tab, setTab] = useState<'url' | 'manual' | 'bundle'>('url')
   const [urlInput, setUrlInput] = useState('')
   const { scrape, loading, error, result, reset } = useUrlScraper()
@@ -40,9 +41,19 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
   // Bundle state
   const [bundleName, setBundleName] = useState('')
   const [bundleImageUrl, setBundleImageUrl] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bundleLines, setBundleLines] = useState<Array<{ id: string; name: string; price: string; url: string }>>([
     { id: '1', name: '', price: '', url: '' },
   ])
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   function addBundleLine() {
     setBundleLines((prev) => [...prev, { id: Date.now().toString(), name: '', price: '', url: '' }])
@@ -57,13 +68,29 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
   }
 
   function bundleTotal(): number {
-    return bundleLines.reduce((sum, l) => sum + (parsePriceInput(l.price) ?? 0), 0)
+    const manualTotal = bundleLines.reduce((sum, l) => sum + (parsePriceInput(l.price) ?? 0), 0)
+    const selectedTotal = existingItems
+      .filter((i) => selectedIds.has(i.id))
+      .reduce((sum, i) => sum + (i.price ?? 0), 0)
+    return manualTotal + selectedTotal
   }
 
   function handleBundleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!bundleName.trim()) return
-    const bundledItems: BundledItem[] = bundleLines
+
+    // Items from existing list
+    const fromExisting: BundledItem[] = existingItems
+      .filter((i) => selectedIds.has(i.id))
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: i.price,
+        productUrl: i.productUrl,
+      }))
+
+    // Items from manual line entries
+    const fromManual: BundledItem[] = bundleLines
       .filter((l) => l.name.trim())
       .map((l) => ({
         id: l.id,
@@ -71,15 +98,27 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
         price: parsePriceInput(l.price),
         productUrl: l.url.trim() || undefined,
       }))
+
+    const bundledItems = [...fromExisting, ...fromManual]
+    if (bundledItems.length === 0) return
+
     const total = bundledItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
-    onAdd({
-      name: bundleName.trim(),
-      price: total > 0 ? total : undefined,
-      imageUrl: bundleImageUrl.trim() || undefined,
-      bundledItems,
-    })
+    // Use the first selected item's image as the bundle image if none provided
+    const fallbackImage = existingItems.find((i) => selectedIds.has(i.id) && i.imageUrl)?.imageUrl
+    const removeIds = [...selectedIds]
+
+    onAdd(
+      {
+        name: bundleName.trim(),
+        price: total > 0 ? total : undefined,
+        imageUrl: bundleImageUrl.trim() || fallbackImage || undefined,
+        bundledItems,
+      },
+      removeIds.length > 0 ? removeIds : undefined
+    )
     setBundleName('')
     setBundleImageUrl('')
+    setSelectedIds(new Set())
     setBundleLines([{ id: '1', name: '', price: '', url: '' }])
   }
 
@@ -273,7 +312,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
       {tab === 'bundle' && (
         <form onSubmit={handleBundleSubmit} className="flex flex-col gap-3">
           <p className="text-zinc-500 text-xs">
-            Group items bought together (e.g. locks for every door) into one ranked purchase.
+            Group items bought together into one ranked purchase. Select items from your list and/or add new ones.
           </p>
 
           <input
@@ -293,9 +332,54 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
             className="bg-zinc-800 rounded-2xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-2 focus:ring-violet-500"
           />
 
-          {/* Line items */}
+          {/* Select from existing items */}
+          {existingItems.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide px-1">From your list</p>
+              <div className="bg-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-700/50">
+                {existingItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => toggleSelected(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                      selectedIds.has(item.id) ? 'bg-violet-900/30' : 'hover:bg-zinc-700/40'
+                    }`}
+                  >
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      selectedIds.has(item.id)
+                        ? 'bg-violet-500 border-violet-500 text-white'
+                        : 'border-zinc-600'
+                    }`}>
+                      {selectedIds.has(item.id) && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                          <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 bg-zinc-700" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center shrink-0 text-sm">🛍️</div>
+                    )}
+                    <span className="text-sm text-zinc-200 truncate flex-1">{item.name}</span>
+                    {item.price != null && (
+                      <span className="text-zinc-500 text-xs shrink-0">{formatPrice(item.price)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+              {selectedIds.size > 0 && (
+                <p className="text-violet-400 text-xs px-1">
+                  {selectedIds.size} item{selectedIds.size !== 1 ? 's' : ''} selected — will be merged into the bundle
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Manual new items */}
           <div className="flex flex-col gap-2">
-            <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide px-1">Items in bundle</p>
+            <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide px-1">Add new items</p>
             {bundleLines.map((line, i) => (
               <div key={line.id} className="bg-zinc-800 rounded-2xl px-3 py-2.5 flex gap-2 items-center">
                 <span className="text-zinc-600 text-xs font-bold w-4 text-center shrink-0">{i + 1}</span>
@@ -345,7 +429,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
 
           <button
             type="submit"
-            disabled={!bundleName.trim() || bundleLines.every((l) => !l.name.trim())}
+            disabled={!bundleName.trim() || (selectedIds.size === 0 && bundleLines.every((l) => !l.name.trim()))}
             className="py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-2xl text-sm transition-colors mt-1"
           >
             Add Bundle to List

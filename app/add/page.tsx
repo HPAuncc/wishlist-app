@@ -12,10 +12,13 @@ type ItemDraft = Omit<WishlistItem, 'id' | 'addedAt' | 'eloRating' | 'comparison
 
 export default function AddPage() {
   const router = useRouter()
-  const { store, setStore, addItem, hydrated } = useWishlist()
+  const { store, setStore, addItem, deleteItem, sortedItems, hydrated } = useWishlist()
   const { queueNewItem, queueLength } = useComparisons(store, setStore)
 
-  function handleAdd(draft: ItemDraft) {
+  function handleAdd(draft: ItemDraft, removeIds?: string[]) {
+    if (removeIds?.length) {
+      removeIds.forEach((id) => deleteItem(id))
+    }
     const newItem = addItem(draft)
     queueNewItem(newItem)
     router.push('/list')
@@ -40,7 +43,7 @@ export default function AddPage() {
             <div className="w-6 h-6 border-2 border-zinc-700 border-t-emerald-500 rounded-full animate-spin" />
           </div>
         ) : (
-          <AddItemForm onAdd={handleAdd} />
+          <AddItemForm onAdd={handleAdd} existingItems={sortedItems} />
         )}
       </main>
 
