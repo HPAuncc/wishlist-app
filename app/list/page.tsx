@@ -1,14 +1,17 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useWishlist } from '@/hooks/useWishlist'
 import { useComparisons } from '@/hooks/useComparisons'
 import RankedList from '@/components/list/RankedList'
 import BottomNav from '@/components/layout/BottomNav'
+import ShareModal from '@/components/list/ShareModal'
 
 export default function ListPage() {
   const { store, setStore, sortedItems, deleteItem, hydrated } = useWishlist()
   const { queueLength } = useComparisons(store, setStore)
+  const [showShare, setShowShare] = useState(false)
 
   return (
     <div className="flex flex-col min-h-screen pb-20">
@@ -24,6 +27,15 @@ export default function ListPage() {
               >
                 ⚡ {queueLength} left
               </Link>
+            )}
+            {sortedItems.length > 0 && (
+              <button
+                onClick={() => setShowShare(true)}
+                className="w-9 h-9 bg-zinc-800 hover:bg-zinc-700 active:scale-90 rounded-full flex items-center justify-center transition-all text-base"
+                aria-label="Share wishlist"
+              >
+                💌
+              </button>
             )}
             <Link
               href="/add"
@@ -47,6 +59,14 @@ export default function ListPage() {
       </main>
 
       <BottomNav compareCount={queueLength} />
+
+      {showShare && (
+        <ShareModal
+          store={store}
+          onImport={(imported) => setStore(imported)}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   )
 }
