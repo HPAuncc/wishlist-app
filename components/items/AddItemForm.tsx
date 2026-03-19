@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useUrlScraper } from '@/hooks/useUrlScraper'
-import { WishlistItem } from '@/types'
+import { WishlistItem, BundledItem } from '@/types'
 
 type ItemDraft = Omit<WishlistItem, 'id' | 'addedAt' | 'eloRating' | 'comparisonCount'>
 
@@ -17,8 +17,12 @@ function parsePriceInput(raw: string): number | undefined {
   return Math.round(num * 100)
 }
 
+function formatPrice(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`
+}
+
 export default function AddItemForm({ onAdd }: AddItemFormProps) {
-  const [tab, setTab] = useState<'url' | 'manual'>('url')
+  const [tab, setTab] = useState<'url' | 'manual' | 'bundle'>('url')
   const [urlInput, setUrlInput] = useState('')
   const { scrape, loading, error, result, reset } = useUrlScraper()
 
@@ -32,6 +36,52 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
   // Inline image paste for partial (blocked) results
   const [partialImageUrl, setPartialImageUrl] = useState('')
   const [partialPriceInput, setPartialPriceInput] = useState('')
+
+  // Bundle state
+  const [bundleName, setBundleName] = useState('')
+  const [bundleImageUrl, setBundleImageUrl] = useState('')
+  const [bundleLines, setBundleLines] = useState<Array<{ id: string; name: string; price: string; url: string }>>([
+    { id: '1', name: '', price: '', url: '' },
+  ])
+
+  function addBundleLine() {
+    setBundleLines((prev) => [...prev, { id: Date.now().toString(), name: '', price: '', url: '' }])
+  }
+
+  function removeBundleLine(id: string) {
+    setBundleLines((prev) => prev.filter((l) => l.id !== id))
+  }
+
+  function updateBundleLine(id: string, field: 'name' | 'price' | 'url', value: string) {
+    setBundleLines((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)))
+  }
+
+  function bundleTotal(): number {
+    return bundleLines.reduce((sum, l) => sum + (parsePriceInput(l.price) ?? 0), 0)
+  }
+
+  function handleBundleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!bundleName.trim()) return
+    const bundledItems: BundledItem[] = bundleLines
+      .filter((l) => l.name.trim())
+      .map((l) => ({
+        id: l.id,
+        name: l.name.trim(),
+        price: parsePriceInput(l.price),
+        productUrl: l.url.trim() || undefined,
+      }))
+    const total = bundledItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
+    onAdd({
+      name: bundleName.trim(),
+      price: total > 0 ? total : undefined,
+      imageUrl: bundleImageUrl.trim() || undefined,
+      bundledItems,
+    })
+    setBundleName('')
+    setBundleImageUrl('')
+    setBundleLines([{ id: '1', name: '', price: '', url: '' }])
+  }
 
   function addFromScrape() {
     if (!result) return
@@ -92,7 +142,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
     <div className="flex flex-col gap-4">
       {/* Tabs */}
       <div className="flex bg-zinc-800 rounded-2xl p-1">
-        {(['url', 'manual'] as const).map((t) => (
+        {([['url', 'From URL'], ['manual', 'Manual'], ['bundle', '📦 Bundle']] as const).map(([t, label]) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -100,7 +150,7 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
               tab === t ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
             }`}
           >
-            {t === 'url' ? 'From URL' : 'Manual'}
+            {label}
           </button>
         ))}
       </div>
@@ -217,6 +267,90 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
             paste the image URL from the product page.
           </p>
         </div>
+      )}
+
+      {/* Bundle Tab */}
+      {tab === 'bundle' && (
+        <form onSubmit={handleBundleSubmit} className="flex flex-col gap-3">
+          <p className="text-zinc-500 text-xs">
+            Group items bought together (e.g. locks for every door) into one ranked purchase.
+          </p>
+
+          <input
+            type="text"
+            value={bundleName}
+            onChange={(e) => setBundleName(e.target.value)}
+            placeholder="Bundle name (e.g. Replace Home Locks) *"
+            required
+            className="bg-zinc-800 rounded-2xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-2 focus:ring-violet-500"
+          />
+
+          <input
+            type="url"
+            value={bundleImageUrl}
+            onChange={(e) => setBundleImageUrl(e.target.value)}
+            placeholder="Bundle image URL (optional)"
+            className="bg-zinc-800 rounded-2xl px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-2 focus:ring-violet-500"
+          />
+
+          {/* Line items */}
+          <div className="flex flex-col gap-2">
+            <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide px-1">Items in bundle</p>
+            {bundleLines.map((line, i) => (
+              <div key={line.id} className="bg-zinc-800 rounded-2xl px-3 py-2.5 flex gap-2 items-center">
+                <span className="text-zinc-600 text-xs font-bold w-4 text-center shrink-0">{i + 1}</span>
+                <input
+                  type="text"
+                  value={line.name}
+                  onChange={(e) => updateBundleLine(line.id, 'name', e.target.value)}
+                  placeholder="Item name"
+                  className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none min-w-0"
+                />
+                <span className="text-zinc-600 text-sm shrink-0">$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={line.price}
+                  onChange={(e) => updateBundleLine(line.id, 'price', e.target.value)}
+                  placeholder="0.00"
+                  className="w-16 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none text-right shrink-0"
+                />
+                {bundleLines.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeBundleLine(line.id)}
+                    className="text-zinc-700 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addBundleLine}
+              className="text-violet-400 hover:text-violet-300 text-sm font-medium py-1 transition-colors text-left px-1"
+            >
+              + Add item
+            </button>
+          </div>
+
+          {/* Total */}
+          {bundleTotal() > 0 && (
+            <div className="flex justify-between items-center px-1 py-2 border-t border-zinc-800">
+              <span className="text-zinc-400 text-sm font-medium">Total</span>
+              <span className="text-emerald-400 font-bold text-base">{formatPrice(bundleTotal())}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={!bundleName.trim() || bundleLines.every((l) => !l.name.trim())}
+            className="py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-semibold rounded-2xl text-sm transition-colors mt-1"
+          >
+            Add Bundle to List
+          </button>
+        </form>
       )}
 
       {/* Manual Tab */}

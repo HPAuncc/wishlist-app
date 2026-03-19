@@ -1,14 +1,22 @@
+export interface BundledItem {
+  id: string
+  name: string
+  price?: number // stored in cents
+  productUrl?: string
+}
+
 export interface WishlistItem {
   id: string
   name: string
   description?: string
-  price?: number // stored in cents
+  price?: number // stored in cents; for bundles this is the sum of bundledItems
   imageUrl?: string
   productUrl?: string
   retailer?: string
   addedAt: number
   eloRating: number
   comparisonCount: number
+  bundledItems?: BundledItem[] // present when this item is a bundle of purchases
 }
 
 export interface Comparison {

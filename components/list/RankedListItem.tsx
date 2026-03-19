@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { WishlistItem } from '@/types'
+import { WishlistItem, BundledItem } from '@/types'
 
 interface RankedListItemProps {
   item: WishlistItem
@@ -86,7 +86,12 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+            {item.bundledItems && item.bundledItems.length > 0 && (
+              <span className="bg-violet-900/40 text-violet-400 text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                📦 {item.bundledItems.length} items
+              </span>
+            )}
             {item.price != null && (
               <span className={`text-sm font-semibold ${rank === 1 ? 'text-yellow-400' : rank === 2 ? 'text-zinc-300' : 'text-emerald-400'}`}>
                 {formatPrice(item.price)}
@@ -122,6 +127,45 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
               {item.description && (
                 <p className="text-zinc-400 text-sm">{item.description}</p>
               )}
+
+              {/* Bundle line items */}
+              {item.bundledItems && item.bundledItems.length > 0 && (
+                <div className="bg-zinc-800/60 rounded-xl overflow-hidden">
+                  {item.bundledItems.map((bi: BundledItem, idx: number) => (
+                    <div
+                      key={bi.id}
+                      className={`flex items-center justify-between px-3 py-2 ${idx > 0 ? 'border-t border-zinc-800' : ''}`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-zinc-600 text-xs w-4 text-center shrink-0">{idx + 1}</span>
+                        {bi.productUrl ? (
+                          <a
+                            href={bi.productUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-zinc-300 text-sm truncate hover:text-zinc-100 underline decoration-zinc-700"
+                          >
+                            {bi.name}
+                          </a>
+                        ) : (
+                          <span className="text-zinc-300 text-sm truncate">{bi.name}</span>
+                        )}
+                      </div>
+                      {bi.price != null && (
+                        <span className="text-zinc-400 text-sm font-medium shrink-0 ml-2">{formatPrice(bi.price)}</span>
+                      )}
+                    </div>
+                  ))}
+                  {item.price != null && (
+                    <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-700 bg-zinc-800">
+                      <span className="text-zinc-400 text-xs font-semibold uppercase tracking-wide">Total</span>
+                      <span className="text-emerald-400 font-bold text-sm">{formatPrice(item.price)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2 flex-wrap">
                 {item.productUrl && (
                   <a

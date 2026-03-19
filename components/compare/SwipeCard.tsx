@@ -87,9 +87,16 @@ export default function SwipeCard({ item, side, onChoose }: SwipeCardProps) {
 
         {/* Info */}
         <div className="p-3 flex-1 flex flex-col justify-between">
-          <p className="font-bold text-zinc-100 text-sm leading-snug line-clamp-2">
-            {item.name}
-          </p>
+          <div>
+            {item.bundledItems && item.bundledItems.length > 0 && (
+              <span className="inline-flex items-center gap-1 bg-violet-900/50 text-violet-300 text-xs font-semibold px-2 py-0.5 rounded-full mb-1.5">
+                📦 {item.bundledItems.length} items
+              </span>
+            )}
+            <p className="font-bold text-zinc-100 text-sm leading-snug line-clamp-2">
+              {item.name}
+            </p>
+          </div>
           <div className="mt-2">
             {item.price != null && (
               <p className="text-emerald-400 text-sm font-bold">{formatPrice(item.price)}</p>
