@@ -59,9 +59,18 @@ export async function POST(request: NextRequest) {
     const hostname = parsed.hostname.replace(/^www\./, '')
     const brandName = hostname.split('.')[0].toLowerCase()
 
+    function proxyImage(imageUrl: string | undefined): string | undefined {
+      if (!imageUrl) return undefined
+      return `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`
+    }
+
     function isGenericTitle(title: string | undefined): boolean {
       if (!title) return true
       const t = title.toLowerCase()
+      // Bot/error pages
+      if (
+        /(access.*(denied|blocked)|denied.*access|just a moment|403|404|forbidden|not found|attention required|verify.*human|are you human|security check|enable.*javascript|please wait|ddos.*protection|cloudflare|bot.*detect|captcha)/i.test(t)
+      ) return true
       return (
         t.includes(brandName) ||
         t.split(' ').length < 3 ||
@@ -74,7 +83,9 @@ export async function POST(request: NextRequest) {
     try {
       const html = await fetchDirect(url)
       const metadata = parseMetadata(html, url)
-      if (metadata.title && !isGenericTitle(metadata.title)) return NextResponse.json(metadata)
+      if (metadata.title && !isGenericTitle(metadata.title)) {
+        return NextResponse.json({ ...metadata, imageUrl: proxyImage(metadata.imageUrl) })
+      }
       throw new Error('No useful title found in direct fetch')
     } catch {
       // Fall through to Microlink
@@ -83,7 +94,9 @@ export async function POST(request: NextRequest) {
     // Fallback: Microlink (handles bot-protected sites)
     try {
       const metadata = await fetchViaMicrolink(url)
-      if (!isGenericTitle(metadata.title)) return NextResponse.json(metadata)
+      if (!isGenericTitle(metadata.title)) {
+        return NextResponse.json({ ...metadata, imageUrl: proxyImage(metadata.imageUrl) })
+      }
       throw new Error('Microlink returned generic title')
     } catch {
       // Last resort: extract name from URL slug so user gets something useful

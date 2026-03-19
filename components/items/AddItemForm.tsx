@@ -29,6 +29,35 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
   const [imageUrl, setImageUrl] = useState('')
   const [productUrl, setProductUrl] = useState('')
 
+  // Inline image paste for partial (blocked) results
+  const [partialImageUrl, setPartialImageUrl] = useState('')
+  const [partialPriceInput, setPartialPriceInput] = useState('')
+
+  function addFromScrape() {
+    if (!result) return
+    if (result.partial) {
+      onAdd({
+        name: result.title ?? '',
+        price: parsePriceInput(partialPriceInput),
+        imageUrl: partialImageUrl.trim() || undefined,
+        productUrl: result.originalUrl,
+        retailer: result.retailer,
+      })
+      setPartialImageUrl('')
+      setPartialPriceInput('')
+    } else {
+      onAdd({
+        name: result.title ?? '',
+        description: result.description,
+        price: parsePriceInput(result.price ?? ''),
+        imageUrl: result.imageUrl || undefined,
+        productUrl: result.originalUrl,
+        retailer: result.retailer,
+      })
+    }
+    reset()
+  }
+
   function populateFromScrape() {
     if (!result) return
     setName(result.title ?? '')
@@ -110,20 +139,18 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
 
           {result && !error && (
             <div className={`rounded-2xl overflow-hidden ${result.partial ? 'bg-amber-950/40 border border-amber-800/40' : 'bg-zinc-800'}`}>
-              {result.partial && (
-                <div className="px-4 pt-3 pb-1">
-                  <p className="text-amber-400 text-xs font-semibold">
-                    ⚠️ {result.retailer ?? 'This store'} blocks auto-fetch — we got the name from the URL. Add the price below.
-                  </p>
-                </div>
-              )}
-              <div className="flex gap-3 p-4">
-                {result.imageUrl && (
+              {/* Header row */}
+              <div className="flex gap-3 p-4 pb-3">
+                {result.imageUrl ? (
                   <img
                     src={result.imageUrl}
                     alt={result.title}
                     className="w-16 h-16 rounded-xl object-cover bg-zinc-700 shrink-0"
                   />
+                ) : (
+                  <div className="w-16 h-16 rounded-xl bg-zinc-800 flex items-center justify-center shrink-0 text-2xl border border-zinc-700">
+                    🛍️
+                  </div>
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-zinc-100 text-sm line-clamp-2">
@@ -137,12 +164,43 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
                   )}
                 </div>
               </div>
+
+              {/* Partial: inline image + price fields */}
+              {result.partial && (
+                <div className="px-4 pb-3 space-y-2">
+                  <p className="text-amber-400 text-xs font-semibold">
+                    ⚠️ {result.retailer ?? 'This store'} blocks auto-fetch. Paste the product image URL below for the best experience.
+                  </p>
+                  <div className="flex items-center gap-2 bg-zinc-900/60 rounded-xl px-3 py-2">
+                    <span className="text-base shrink-0">🖼️</span>
+                    <input
+                      type="url"
+                      value={partialImageUrl}
+                      onChange={(e) => setPartialImageUrl(e.target.value)}
+                      placeholder="Paste image URL (right-click image → Copy Image Address)"
+                      className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 bg-zinc-900/60 rounded-xl px-3 py-2">
+                    <span className="text-base shrink-0">💰</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={partialPriceInput}
+                      onChange={(e) => setPartialPriceInput(e.target.value)}
+                      placeholder="Price (e.g. 499.99)"
+                      className="flex-1 bg-transparent text-xs text-zinc-200 placeholder-zinc-600 outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 px-4 pb-4">
                 <button
-                  onClick={populateFromScrape}
+                  onClick={addFromScrape}
                   className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold rounded-xl text-sm transition-colors"
                 >
-                  {result.partial ? 'Edit & Add →' : 'Add to List'}
+                  Add to List
                 </button>
                 <button
                   onClick={reset}
@@ -155,8 +213,8 @@ export default function AddItemForm({ onAdd }: AddItemFormProps) {
           )}
 
           <p className="text-zinc-600 text-xs text-center">
-            Works with Etsy, IKEA, Crate & Barrel, Pottery Barn, West Elm & more.
-            <br />Amazon, Lowe's & Walmart need manual entry.
+            Works with Etsy, IKEA, Amazon, Target & more. For blocked stores,
+            paste the image URL from the product page.
           </p>
         </div>
       )}
