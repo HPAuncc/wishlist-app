@@ -42,21 +42,12 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
   const [bundleName, setBundleName] = useState('')
   const [bundleImageUrl, setBundleImageUrl] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [bundleLines, setBundleLines] = useState<Array<{ id: string; name: string; price: string; url: string }>>([
-    { id: '1', name: '', price: '', url: '' },
+  const [bundleLines, setBundleLines] = useState<Array<{ id: string; name: string; price: string; qty: number; url: string }>>([
+    { id: '1', name: '', price: '', qty: 1, url: '' },
   ])
 
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   function addBundleLine() {
-    setBundleLines((prev) => [...prev, { id: Date.now().toString(), name: '', price: '', url: '' }])
+    setBundleLines((prev) => [...prev, { id: Date.now().toString(), name: '', price: '', qty: 1, url: '' }])
   }
 
   function removeBundleLine(id: string) {
@@ -67,11 +58,36 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
     setBundleLines((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)))
   }
 
+  function updateBundleLineQty(id: string, qty: number) {
+    setBundleLines((prev) => prev.map((l) => (l.id === id ? { ...l, qty: Math.max(1, qty) } : l)))
+  }
+
+  // Track quantities for existing items too
+  const [selectedQtys, setSelectedQtys] = useState<Record<string, number>>({})
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+        setSelectedQtys((q) => { const n = { ...q }; delete n[id]; return n })
+      } else {
+        next.add(id)
+        setSelectedQtys((q) => ({ ...q, [id]: 1 }))
+      }
+      return next
+    })
+  }
+
+  function updateSelectedQty(id: string, qty: number) {
+    setSelectedQtys((prev) => ({ ...prev, [id]: Math.max(1, qty) }))
+  }
+
   function bundleTotal(): number {
-    const manualTotal = bundleLines.reduce((sum, l) => sum + (parsePriceInput(l.price) ?? 0), 0)
+    const manualTotal = bundleLines.reduce((sum, l) => sum + (parsePriceInput(l.price) ?? 0) * l.qty, 0)
     const selectedTotal = existingItems
       .filter((i) => selectedIds.has(i.id))
-      .reduce((sum, i) => sum + (i.price ?? 0), 0)
+      .reduce((sum, i) => sum + (i.price ?? 0) * (selectedQtys[i.id] ?? 1), 0)
     return manualTotal + selectedTotal
   }
 
@@ -86,6 +102,7 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
         id: i.id,
         name: i.name,
         price: i.price,
+        quantity: selectedQtys[i.id] ?? 1,
         productUrl: i.productUrl,
       }))
 
@@ -96,13 +113,14 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
         id: l.id,
         name: l.name.trim(),
         price: parsePriceInput(l.price),
+        quantity: l.qty,
         productUrl: l.url.trim() || undefined,
       }))
 
     const bundledItems = [...fromExisting, ...fromManual]
     if (bundledItems.length === 0) return
 
-    const total = bundledItems.reduce((sum, i) => sum + (i.price ?? 0), 0)
+    const total = bundledItems.reduce((sum, i) => sum + (i.price ?? 0) * i.quantity, 0)
     // Use the first selected item's image as the bundle image if none provided
     const fallbackImage = existingItems.find((i) => selectedIds.has(i.id) && i.imageUrl)?.imageUrl
     const removeIds = [...selectedIds]
@@ -119,7 +137,8 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
     setBundleName('')
     setBundleImageUrl('')
     setSelectedIds(new Set())
-    setBundleLines([{ id: '1', name: '', price: '', url: '' }])
+    setSelectedQtys({})
+    setBundleLines([{ id: '1', name: '', price: '', qty: 1, url: '' }])
   }
 
   function addFromScrape() {
@@ -338,35 +357,48 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
               <p className="text-zinc-500 text-xs font-medium uppercase tracking-wide px-1">From your list</p>
               <div className="bg-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-700/50">
                 {existingItems.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
-                    onClick={() => toggleSelected(item.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 transition-colors ${
                       selectedIds.has(item.id) ? 'bg-violet-900/30' : 'hover:bg-zinc-700/40'
                     }`}
                   >
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      selectedIds.has(item.id)
-                        ? 'bg-violet-500 border-violet-500 text-white'
-                        : 'border-zinc-600'
-                    }`}>
-                      {selectedIds.has(item.id) && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                    <button
+                      type="button"
+                      onClick={() => toggleSelected(item.id)}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    >
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        selectedIds.has(item.id)
+                          ? 'bg-violet-500 border-violet-500 text-white'
+                          : 'border-zinc-600'
+                      }`}>
+                        {selectedIds.has(item.id) && (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </div>
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 bg-zinc-700" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center shrink-0 text-sm">🛍️</div>
                       )}
-                    </div>
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 bg-zinc-700" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center shrink-0 text-sm">🛍️</div>
+                      <span className="text-sm text-zinc-200 truncate flex-1">{item.name}</span>
+                    </button>
+                    {selectedIds.has(item.id) && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button type="button" onClick={() => updateSelectedQty(item.id, (selectedQtys[item.id] ?? 1) - 1)}
+                          className="w-6 h-6 rounded-md bg-zinc-700 text-zinc-300 text-sm flex items-center justify-center hover:bg-zinc-600">−</button>
+                        <span className="text-xs text-zinc-200 w-5 text-center font-medium">{selectedQtys[item.id] ?? 1}</span>
+                        <button type="button" onClick={() => updateSelectedQty(item.id, (selectedQtys[item.id] ?? 1) + 1)}
+                          className="w-6 h-6 rounded-md bg-zinc-700 text-zinc-300 text-sm flex items-center justify-center hover:bg-zinc-600">+</button>
+                      </div>
                     )}
-                    <span className="text-sm text-zinc-200 truncate flex-1">{item.name}</span>
                     {item.price != null && (
-                      <span className="text-zinc-500 text-xs shrink-0">{formatPrice(item.price)}</span>
+                      <span className="text-zinc-500 text-xs shrink-0">{formatPrice(item.price * (selectedQtys[item.id] ?? 1))}</span>
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
               {selectedIds.size > 0 && (
@@ -390,6 +422,13 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
                   placeholder="Item name"
                   className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none min-w-0"
                 />
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={() => updateBundleLineQty(line.id, line.qty - 1)}
+                    className="w-5 h-5 rounded bg-zinc-700 text-zinc-300 text-xs flex items-center justify-center hover:bg-zinc-600">−</button>
+                  <span className="text-xs text-zinc-200 w-4 text-center">{line.qty}</span>
+                  <button type="button" onClick={() => updateBundleLineQty(line.id, line.qty + 1)}
+                    className="w-5 h-5 rounded bg-zinc-700 text-zinc-300 text-xs flex items-center justify-center hover:bg-zinc-600">+</button>
+                </div>
                 <span className="text-zinc-600 text-sm shrink-0">$</span>
                 <input
                   type="text"
@@ -397,7 +436,7 @@ export default function AddItemForm({ onAdd, existingItems = [] }: AddItemFormPr
                   value={line.price}
                   onChange={(e) => updateBundleLine(line.id, 'price', e.target.value)}
                   placeholder="0.00"
-                  className="w-16 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none text-right shrink-0"
+                  className="w-14 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none text-right shrink-0"
                 />
                 {bundleLines.length > 1 && (
                   <button

@@ -90,7 +90,7 @@ export default function SwipeCard({ item, side, onChoose }: SwipeCardProps) {
           <div>
             {item.bundledItems && item.bundledItems.length > 0 && (
               <span className="inline-flex items-center gap-1 bg-violet-900/50 text-violet-300 text-xs font-semibold px-2 py-0.5 rounded-full mb-1.5">
-                📦 {item.bundledItems.length} items
+                📦 {item.bundledItems.reduce((sum, bi) => sum + (bi.quantity ?? 1), 0)} items
               </span>
             )}
             <p className="font-bold text-zinc-100 text-sm leading-snug line-clamp-2">

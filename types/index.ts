@@ -1,7 +1,8 @@
 export interface BundledItem {
   id: string
   name: string
-  price?: number // stored in cents
+  price?: number // stored in cents (per unit)
+  quantity: number
   productUrl?: string
 }
 

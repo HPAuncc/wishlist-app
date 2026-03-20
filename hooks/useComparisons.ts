@@ -15,7 +15,26 @@ export function useComparisons(
   store: WishlistStore,
   setStore: Dispatch<SetStateAction<WishlistStore>>
 ) {
-  const currentTask = store.comparisonQueue[0] ?? null
+  // Auto-clean stale tasks referencing deleted/bundled items
+  const itemIds = new Set(store.items.map((i) => i.id))
+  const validQueue = store.comparisonQueue.filter(
+    (t) => itemIds.has(t.itemAId) && itemIds.has(t.itemBId)
+  )
+
+  if (validQueue.length !== store.comparisonQueue.length) {
+    setTimeout(() => {
+      setStore((prev) => {
+        const ids = new Set(prev.items.map((i) => i.id))
+        const cleaned = prev.comparisonQueue.filter(
+          (t) => ids.has(t.itemAId) && ids.has(t.itemBId)
+        )
+        if (cleaned.length === prev.comparisonQueue.length) return prev
+        return { ...prev, comparisonQueue: cleaned }
+      })
+    }, 0)
+  }
+
+  const currentTask = validQueue[0] ?? null
 
   const queueNewItem = useCallback(
     (newItem: WishlistItem) => {
@@ -100,5 +119,5 @@ export function useComparisons(
     [setStore]
   )
 
-  return { currentTask, queueLength: store.comparisonQueue.length, queueNewItem, recordComparison }
+  return { currentTask, queueLength: validQueue.length, queueNewItem, recordComparison }
 }
