@@ -8,6 +8,7 @@ interface RankedListItemProps {
   item: WishlistItem
   rank: number
   onDelete: (id: string) => void
+  onUpdate: (id: string, updates: Partial<WishlistItem>) => void
 }
 
 const MEDALS = ['🥇', '🥈', '🥉']
@@ -42,9 +43,69 @@ const rankClass: Record<number, string> = {
   3: 'rank-3',
 }
 
-export default function RankedListItem({ item, rank, onDelete }: RankedListItemProps) {
+function parsePriceCents(raw: string): number | undefined {
+  const cleaned = raw.replace(/[^0-9.]/g, '')
+  const num = parseFloat(cleaned)
+  if (isNaN(num)) return undefined
+  return Math.round(num * 100)
+}
+
+export default function RankedListItem({ item, rank, onDelete, onUpdate }: RankedListItemProps) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [editing, setEditing] = useState(false)
+
+  // Edit state for bundle
+  const [editName, setEditName] = useState('')
+  const [editItems, setEditItems] = useState<Array<BundledItem & { _price: string }>>([])
+
+  function startEditing() {
+    setEditName(item.name)
+    setEditItems(
+      (item.bundledItems ?? []).map((bi) => ({
+        ...bi,
+        quantity: bi.quantity ?? 1,
+        _price: bi.price != null ? (bi.price / 100).toFixed(2) : '',
+      }))
+    )
+    setEditing(true)
+  }
+
+  function addEditLine() {
+    setEditItems((prev) => [
+      ...prev,
+      { id: Date.now().toString(), name: '', quantity: 1, _price: '' },
+    ])
+  }
+
+  function removeEditLine(id: string) {
+    setEditItems((prev) => prev.filter((l) => l.id !== id))
+  }
+
+  function saveEdits() {
+    const updatedBundledItems: BundledItem[] = editItems
+      .filter((l) => l.name.trim())
+      .map((l) => ({
+        id: l.id,
+        name: l.name.trim(),
+        price: parsePriceCents(l._price),
+        quantity: l.quantity,
+        productUrl: l.productUrl,
+      }))
+
+    const total = updatedBundledItems.reduce(
+      (sum, i) => sum + (i.price ?? 0) * i.quantity,
+      0
+    )
+
+    onUpdate(item.id, {
+      name: editName.trim() || item.name,
+      bundledItems: updatedBundledItems,
+      price: total > 0 ? total : undefined,
+    })
+    setEditing(false)
+  }
+
   const uncertain = item.comparisonCount < 3
   const extra = rankClass[rank] ?? ''
 
@@ -129,7 +190,7 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
               )}
 
               {/* Bundle line items */}
-              {item.bundledItems && item.bundledItems.length > 0 && (
+              {item.bundledItems && item.bundledItems.length > 0 && !editing && (
                 <div className="bg-zinc-800/60 rounded-xl overflow-hidden">
                   {item.bundledItems.map((bi: BundledItem, idx: number) => (
                     <div
@@ -151,9 +212,14 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
                         ) : (
                           <span className="text-zinc-300 text-sm truncate">{bi.name}</span>
                         )}
+                        {(bi.quantity ?? 1) > 1 && (
+                          <span className="text-zinc-500 text-xs shrink-0">x{bi.quantity}</span>
+                        )}
                       </div>
                       {bi.price != null && (
-                        <span className="text-zinc-400 text-sm font-medium shrink-0 ml-2">{formatPrice(bi.price)}</span>
+                        <span className="text-zinc-400 text-sm font-medium shrink-0 ml-2">
+                          {formatPrice(bi.price * (bi.quantity ?? 1))}
+                        </span>
                       )}
                     </div>
                   ))}
@@ -166,7 +232,116 @@ export default function RankedListItem({ item, rank, onDelete }: RankedListItemP
                 </div>
               )}
 
+              {/* Bundle edit mode */}
+              {editing && (
+                <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Bundle name"
+                    className="w-full bg-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <div className="bg-zinc-800/60 rounded-xl overflow-hidden divide-y divide-zinc-800">
+                    {editItems.map((line, idx) => (
+                      <div key={line.id} className="flex items-center gap-2 px-3 py-2">
+                        <span className="text-zinc-600 text-xs w-4 text-center shrink-0">{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={line.name}
+                          onChange={(e) =>
+                            setEditItems((prev) =>
+                              prev.map((l) => (l.id === line.id ? { ...l, name: e.target.value } : l))
+                            )
+                          }
+                          placeholder="Item name"
+                          className="flex-1 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none min-w-0"
+                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditItems((prev) =>
+                                prev.map((l) =>
+                                  l.id === line.id ? { ...l, quantity: Math.max(1, l.quantity - 1) } : l
+                                )
+                              )
+                            }
+                            className="w-5 h-5 rounded bg-zinc-700 text-zinc-300 text-xs flex items-center justify-center hover:bg-zinc-600"
+                          >
+                            −
+                          </button>
+                          <span className="text-xs text-zinc-200 w-4 text-center">{line.quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setEditItems((prev) =>
+                                prev.map((l) =>
+                                  l.id === line.id ? { ...l, quantity: l.quantity + 1 } : l
+                                )
+                              )
+                            }
+                            className="w-5 h-5 rounded bg-zinc-700 text-zinc-300 text-xs flex items-center justify-center hover:bg-zinc-600"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-zinc-600 text-sm shrink-0">$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={line._price}
+                          onChange={(e) =>
+                            setEditItems((prev) =>
+                              prev.map((l) => (l.id === line.id ? { ...l, _price: e.target.value } : l))
+                            )
+                          }
+                          placeholder="0.00"
+                          className="w-14 bg-transparent text-sm text-zinc-100 placeholder-zinc-600 outline-none text-right shrink-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeEditLine(line.id)}
+                          className="text-zinc-700 hover:text-red-400 transition-colors shrink-0 text-lg leading-none"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addEditLine}
+                    className="text-violet-400 hover:text-violet-300 text-sm font-medium py-1 transition-colors text-left px-1"
+                  >
+                    + Add item
+                  </button>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={saveEdits}
+                      className="flex-1 py-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl text-sm transition-colors"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditing(false)}
+                      className="py-2 px-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 flex-wrap">
+                {item.bundledItems && item.bundledItems.length > 0 && !editing && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startEditing() }}
+                    className="py-2.5 px-4 bg-violet-900/40 hover:bg-violet-900/60 rounded-xl text-sm font-medium text-violet-300 transition-colors"
+                  >
+                    Edit Bundle
+                  </button>
+                )}
                 {item.productUrl && (
                   <a
                     href={item.productUrl}

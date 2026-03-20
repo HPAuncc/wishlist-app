@@ -317,6 +317,7 @@ export function useSupabaseWishlist() {
         if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl
         if (updates.eloRating !== undefined) dbUpdates.elo_rating = updates.eloRating
         if (updates.comparisonCount !== undefined) dbUpdates.comparison_count = updates.comparisonCount
+        if (updates.bundledItems !== undefined) dbUpdates.bundled_items = updates.bundledItems
 
         if (Object.keys(dbUpdates).length > 0) {
           supabase.from('wishlist_items').update(dbUpdates).eq('id', id)

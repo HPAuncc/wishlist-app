@@ -11,7 +11,7 @@ import ShareModal from '@/components/list/ShareModal'
 
 export default function ListPage() {
   const router = useRouter()
-  const { store, setStore, sortedItems, deleteItem, hydrated, householdId } = useSupabaseWishlist()
+  const { store, setStore, sortedItems, deleteItem, updateItem, hydrated, householdId } = useSupabaseWishlist()
   const { queueLength } = useComparisons(store, setStore)
   const [showShare, setShowShare] = useState(false)
 
@@ -61,7 +61,7 @@ export default function ListPage() {
             <div className="w-6 h-6 border-2 border-zinc-700 border-t-emerald-500 rounded-full animate-spin" />
           </div>
         ) : (
-          <RankedList items={sortedItems} onDelete={deleteItem} compareCount={queueLength} />
+          <RankedList items={sortedItems} onDelete={deleteItem} onUpdate={updateItem} compareCount={queueLength} />
         )}
       </main>
 

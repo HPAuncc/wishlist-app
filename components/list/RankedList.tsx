@@ -8,10 +8,11 @@ import Link from 'next/link'
 interface RankedListProps {
   items: WishlistItem[]
   onDelete: (id: string) => void
+  onUpdate: (id: string, updates: Partial<WishlistItem>) => void
   compareCount: number
 }
 
-export default function RankedList({ items, onDelete, compareCount }: RankedListProps) {
+export default function RankedList({ items, onDelete, onUpdate, compareCount }: RankedListProps) {
   if (items.length === 0) {
     return (
       <motion.div
@@ -37,7 +38,7 @@ export default function RankedList({ items, onDelete, compareCount }: RankedList
   if (items.length === 1) {
     return (
       <div className="flex flex-col gap-3 px-4">
-        <RankedListItem item={items[0]} rank={1} onDelete={onDelete} />
+        <RankedListItem item={items[0]} rank={1} onDelete={onDelete} onUpdate={onUpdate} />
         <div className="text-center py-6">
           <p className="text-zinc-500 text-sm">Add one more item to start comparing</p>
           <Link href="/add" className="mt-2 inline-block text-emerald-400 text-sm font-semibold">
@@ -77,7 +78,7 @@ export default function RankedList({ items, onDelete, compareCount }: RankedList
 
       <AnimatePresence>
         {items.map((item, idx) => (
-          <RankedListItem key={item.id} item={item} rank={idx + 1} onDelete={onDelete} />
+          <RankedListItem key={item.id} item={item} rank={idx + 1} onDelete={onDelete} onUpdate={onUpdate} />
         ))}
       </AnimatePresence>
 
